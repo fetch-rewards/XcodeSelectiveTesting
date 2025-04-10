@@ -30,18 +30,25 @@ extension TestPlanHelper {
                 return target.name
             }
         })
-
         testPlan.testTargets = testPlan.testTargets.compactMap { target in
-            let enabled = targetsToTest.contains(target.target.name) ||
-                packagesToTest.contains(target.target.name)
+            let targetName = target.target.name
+
+            let isDirectMatch = targetsToTest.contains(targetName)
+            let isPackageTestMatch = packagesToTest.contains { packageName in
+                targetName == packageName || targetName == packageName + "Tests"
+            }
+
+            let enabled = isDirectMatch || isPackageTestMatch
 
             guard enabled else { return nil }
-            
-            return TestTarget(parallelizable: target.parallelizable,
-                              skippedTests: target.skippedTests,
-                              selectedTests: target.selectedTests,
-                              target: target.target,
-                              enabled: enabled)
+
+            return TestTarget(
+                parallelizable: target.parallelizable,
+                skippedTests: target.skippedTests,
+                selectedTests: target.selectedTests,
+                target: target.target,
+                enabled: enabled
+            )
         }
     }
 }

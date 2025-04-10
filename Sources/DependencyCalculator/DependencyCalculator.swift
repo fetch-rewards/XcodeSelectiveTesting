@@ -32,7 +32,7 @@ public extension WorkspaceInfo {
 
     internal func targetForFolder(_ path: Path) -> TargetIdentity? {
         return folders.first { folder, _ in
-            path.string.contains(folder.string + "/")
+            path.string.hasPrefix(folder.string)
         }?.value
     }
 

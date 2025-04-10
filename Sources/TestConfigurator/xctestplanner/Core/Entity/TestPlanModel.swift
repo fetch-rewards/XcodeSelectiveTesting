@@ -40,6 +40,8 @@ public struct DefaultOptions: Codable {
     public var testRepetitionMode: String?
     public var maximumTestRepetitions: Int?
     public var maximumTestExecutionTimeAllowance: Int?
+    public var defaultTestExecutionTimeAllowance: Int?
+    public var testExecutionOrdering: String?
     public var targetForVariableExpansion: Target?
 }
 
