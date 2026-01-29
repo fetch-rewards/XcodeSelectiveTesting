@@ -2,6 +2,9 @@ name: Release
 
 on:
   workflow_dispatch:
+  push:
+    tags:
+      - '*'
   release:
     types: [published]
 
@@ -62,7 +65,6 @@ jobs:
       run: echo "checksum=$(swift package compute-checksum xcode-selective-test.artifactbundle.zip)" >> "$GITHUB_OUTPUT"
     
   deploy-binary:
-    if: ${{ github.event_name == 'release' }}
     needs: [check-portability, make-artifact-bundle]
     runs-on: ubuntu-latest
     steps:
@@ -77,7 +79,7 @@ jobs:
           ```swift
           .binaryTarget(
             name: "xcode-selective-test",
-            url: "https://github.com/${{ github.repository }}/releases/download/${{ github.event.release.tag_name }}/xcode-selective-test.artifactbundle.zip",
+            url: "https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/xcode-selective-test.artifactbundle.zip",
             checksum: "${{ needs.make-artifact-bundle.outputs.checksum }}"
           )
           ```
