@@ -1,0 +1,14 @@
+name: Tag Version
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  tag:
+    uses: fetch-rewards/common-workflows/.github/workflows/increment-semantic-version.yml@main
+    with:
+      version-type: patch
+      use-app-token: true # Required to trigger the release workflow
+    secrets: inherit
