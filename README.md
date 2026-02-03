@@ -2,7 +2,7 @@
 
 Run only tests relevant to the changeset.
 
-[Watch my talk from Swift Connection 2025](https://www.youtube.com/watch?v=U1fJQRbq-TY)
+[Watch Video](https://www.youtube.com/watch?v=0JOX1czraGA)
 
 [![Swift](https://github.com/mikeger/SelectiveTesting/actions/workflows/test.yml/badge.svg)](https://github.com/mikeger/SelectiveTesting/actions/workflows/test.yml)
 
@@ -48,7 +48,7 @@ Alternatively, you can use a prebuilt binary release of the tool distributed und
 
 ### Using Swift Package Manager
 
-Add `.package(url: "git@github.com:mikeger/XcodeSelectiveTesting", .upToNextMajor(from: "0.14.2"))` to your `Package.swift`'s `dependencies` section.
+Add `.package(url: "git@github.com:mikeger/XcodeSelectiveTesting", .upToNextMajor(from: "0.11.3"))` to your `Package.swift`'s `dependencies` section.
 
 Use SPM to run the command: `swift run xcode-selective-test`.
 
@@ -56,7 +56,7 @@ Alternatively, you can use a prebuilt binary release of the tool distributed und
 
 ### Using [Mint](https://github.com/yonaskolb/Mint)
 
-`mint install mikeger/XcodeSelectiveTesting@0.14.2`
+`mint install mikeger/XcodeSelectiveTesting@0.11.3`
 
 ### Manually
 
@@ -83,15 +83,8 @@ NB: This command assumes you have [jq](https://jqlang.github.io/jq/) tool instal
 
 Alternatively, you can use CLI to achieve the same result:
 
-1. Run `mint run mikeger/XcodeSelectiveTesting@0.14.2 YourWorkspace.xcworkspace --test-plan YourTestPlan.xctestplan`
-2. Run tests normally, XcodeSelectiveTesting would modify your test plan according to the local changes
-
-To process multiple test plans, specify the `--test-plan` option multiple times:
-```bash
-mint run mikeger/XcodeSelectiveTesting@0.14.2 YourWorkspace.xcworkspace \
-  --test-plan TestPlan1.xctestplan \
-  --test-plan TestPlan2.xctestplan
-```
+1. Run `mint run mikeger/XcodeSelectiveTesting@0.11.3 YourWorkspace.xcworkspace --test-plan YourTestPlan.xctestplan`
+2. Run tests normally, XcodeSelectiveTesting would modify your test plan according to the local changes 
 
 ### Use case: Xcode-based project, execute tests on the CI, no test plan
 
@@ -103,16 +96,8 @@ mint run mikeger/XcodeSelectiveTesting@0.14.2 YourWorkspace.xcworkspace \
 ### Use case: Xcode-based project, execute tests on the CI, with test plan
 
 1. Add code to install the tool
-2. Add a CI step before you execute your tests: `mint run mikeger/XcodeSelectiveTesting@0.14.2 YourWorkspace.xcworkspace --test-plan YourTestPlan.xctestplan --base-branch $PR_BASE_BRANCH`
+2. Add a CI step before you execute your tests: `mint run mikeger/XcodeSelectiveTesting@0.11.3 YourWorkspace.xcworkspace --test-plan YourTestPlan.xctestplan --base-branch $PR_BASE_BRANCH`
 3. Execute your tests
-
-To process multiple test plans on CI:
-```bash
-mint run mikeger/XcodeSelectiveTesting@0.14.2 YourWorkspace.xcworkspace \
-  --test-plan TestPlan1.xctestplan \
-  --test-plan TestPlan2.xctestplan \
-  --base-branch $PR_BASE_BRANCH
-```
 
 ### Use case: GitHub Actions, other cases when the git repo is not in the shape to provide the changeset out of the box
 
@@ -129,7 +114,7 @@ Git allows us to find what files were touched in the changeset.
 ```bash
 Root
 ├── Dependencies
-│   ├── Login
+│   └── Login
 │   ├── ❗️LoginAssembly.swift
 │   └── ...
 ├── MyProject.xcodeproj
@@ -160,7 +145,7 @@ This is the hardest part: dealing with obscure Xcode formats. But if we get that
 
 - `--help`: Display all command line options
 - `--base-branch`: Branch to compare against to find the relevant changes. If emitted, a local changeset is used (development mode).
-- `--test-plan`: Path to the test plan. If not given, tool would try to infer the path. Can be specified multiple times to process multiple test plans.
+- `--test-plan`: Path to the test plan. If not given, tool would try to infer the path.
 - `--json`: Provide output in JSON format (STDOUT).
 - `--dependency-graph`: Opens Safari with a dependency graph visualization. Attention: if you don't trust Javascript ecosystem prefer using `--dot` option. More info [here](https://github.com/mikeger/XcodeSelectiveTesting/wiki/How-to-visualize-your-dependency-structure).
 - `--dot`: Output dependency graph in Dot (Graphviz) format. To be used with Graphviz: `brew install graphviz`, then `xcode-selective-test --dot | dot -Tsvg > output.svg && open output.svg`
@@ -175,8 +160,7 @@ It is possible to define the configuration in a separate file. The tool would lo
 Options available are (see `selective-testing-config-example.yml` for an example):
 
 - `basePath`: Relative or absolute path to the project. If set, the command line option can be emitted.
-- `testPlan`: Relative or absolute path to the test plan to configure. For backwards compatibility.
-- `testPlans`: Array of relative or absolute paths to test plans to configure. Use this to process multiple test plans.
+- `testPlan`: Relative or absolute path to the test plan to configure.
 - `exclude`: List of relative paths to exclude when looking for Swift packages.
 - `extra/dependencies`: Options allowing to hint tool about dependencies between targets or packages.
 - `extra/targetsFiles`: Options allowing to hint tool about the files affecting targets or packages.
@@ -208,6 +192,5 @@ See LICENSE
 - [Bruno Guidolim](https://github.com/bguidolim)
 - [Alex Deem](https://github.com/alexdeem)
 - [Steffen Matthischke](https://github.com/HeEAaD)
-- [Econa77](https://github.com/Econa77)
 
 If you like this product, consider donating to my hometown's charity project [Monsters Corporation](https://monstrov.org) 🤝

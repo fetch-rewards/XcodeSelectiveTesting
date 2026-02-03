@@ -4,7 +4,7 @@
 
 import Foundation
 import PathKit
-import Logging
+import SelectiveTestLogger
 import Workspace
 
 public extension WorkspaceInfo {
@@ -18,7 +18,7 @@ public extension WorkspaceInfo {
             } else if let targetFromFolder = targetForFolder(path) {
                 result.insert(targetFromFolder)
             } else {
-                logger.info("Changed file at \(path) appears not to belong to any target")
+                Logger.message("Changed file at \(path) appears not to belong to any target")
             }
         }
         if incldueIndirectlyAffected {
@@ -32,7 +32,7 @@ public extension WorkspaceInfo {
 
     internal func targetForFolder(_ path: Path) -> TargetIdentity? {
         return folders.first { folder, _ in
-            path.string.contains(folder.string + "/")
+            path.string.hasPrefix(folder.string)
         }?.value
     }
 

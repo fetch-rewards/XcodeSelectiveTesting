@@ -3,12 +3,12 @@
 //
 
 import Foundation
-@preconcurrency import PathKit
-import Logging
+import PathKit
+import SelectiveTestLogger
 import SelectiveTestShell
 import Workspace
 
-struct PackageTargetMetadata: Sendable {
+struct PackageTargetMetadata {
     let path: Path
     let affectedBy: Set<Path>
     let name: String
@@ -25,7 +25,7 @@ struct PackageTargetMetadata: Sendable {
             flags.append("--ignore-lock")
         }
 
-        let manifest = try Shell.execOrFail("(cd \(path.string.shellQuoted) && swift package dump-package \(flags.joined(separator: " ")))")
+        let manifest = try Shell.execOrFail("cd \(path) && swift package dump-package \(flags.joined(separator: " "))")
             .trimmingCharacters(in: .newlines)
         guard let manifestData = manifest.data(using: .utf8),
               let manifestJson = try JSONSerialization.jsonObject(with: manifestData, options: []) as? [String: Any],
@@ -87,10 +87,7 @@ struct PackageTargetMetadata: Sendable {
 
             let type = target["type"] as? String
 
-            var affectedBy = Set<Path>([
-                path + "Package.swift",
-                path + "Package.resolved"
-            ])
+            var affectedBy = Set<Path>([path + "Package.swift"])
 
             let typePath: String
 

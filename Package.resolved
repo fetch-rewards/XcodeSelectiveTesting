@@ -1,13 +1,12 @@
 {
-  "originHash" : "5afd8be6e36d2f7cf1e00bd71901ab1daeb41f6d4d2bc1a212b879e0e4bde9d8",
   "pins" : [
     {
       "identity" : "aexml",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/tadija/AEXML.git",
       "state" : {
-        "revision" : "db806756c989760b35108146381535aec231092b",
-        "version" : "4.7.0"
+        "revision" : "38f7d00b23ecd891e1ee656fa6aeebd6ba04ecc3",
+        "version" : "4.6.1"
       }
     },
     {
@@ -17,6 +16,15 @@
       "state" : {
         "revision" : "3bfd2737b700b9a36565a8c94f4ad2b050a5e574",
         "version" : "1.0.1"
+      }
+    },
+    {
+      "identity" : "rainbow",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/onevcat/Rainbow",
+      "state" : {
+        "revision" : "e0dada9cd44e3fa7ec3b867e49a8ddbf543e3df3",
+        "version" : "4.0.1"
       }
     },
     {
@@ -38,21 +46,12 @@
       }
     },
     {
-      "identity" : "swift-log",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/apple/swift-log",
-      "state" : {
-        "revision" : "ce592ae52f982c847a4efc0dd881cc9eb32d29f2",
-        "version" : "1.6.4"
-      }
-    },
-    {
       "identity" : "xcodeproj",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/tuist/XcodeProj.git",
       "state" : {
-        "revision" : "ed88497ccc09558900206d29fecfa20a5bcbe57f",
-        "version" : "9.0.2"
+        "revision" : "0b5e5a80e4357bf27bf1ba28879896a7d965a092",
+        "version" : "8.24.2"
       }
     },
     {
@@ -65,5 +64,5 @@
       }
     }
   ],
-  "version" : 3
+  "version" : 2
 }

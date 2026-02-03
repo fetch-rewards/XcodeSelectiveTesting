@@ -2,9 +2,9 @@
 //  Created by Mike Gerasymenko <mike@gera.cx>
 //
 
-@preconcurrency import ArgumentParser
+import ArgumentParser
 import SelectiveTestingCore
-import Logging
+import SelectiveTestLogger
 
 @main
 struct SelectiveTesting: AsyncParsableCommand {
@@ -19,8 +19,8 @@ struct SelectiveTesting: AsyncParsableCommand {
     @Option(name: .long, help: "Name of the base branch")
     var baseBranch: String?
 
-    @Option(name: .long, parsing: .upToNextOption, help: "Test plan(s) to modify. Can be specified multiple times.")
-    var testPlan: [String] = []
+    @Option(name: .long, help: "Test plan to modify")
+    var testPlan: String?
 
     @Flag(name: .long, help: "Output in JSON format")
     var JSON: Bool = false
@@ -34,22 +34,18 @@ struct SelectiveTesting: AsyncParsableCommand {
     @Flag(help: "Turbo mode: run directly affected tests only")
     var turbo: Bool = false
     
-    @Flag(help: "Dry run: do not modify the test plans")
-    var dryRun: Bool = false
-    
     @Flag(help: "Produce verbose output")
     var verbose: Bool = false
 
     mutating func run() async throws {
         let tool = try SelectiveTestingTool(baseBranch: baseBranch,
                                             basePath: basePath,
-                                            testPlans: testPlan,
+                                            testPlan: testPlan,
                                             changedFiles: changedFiles,
                                             printJSON: JSON,
                                             renderDependencyGraph: dependencyGraph,
                                             dot: dot,
                                             turbo: turbo,
-                                            dryRun: dryRun,
                                             verbose: verbose)
         let _ = try await tool.run()
     }

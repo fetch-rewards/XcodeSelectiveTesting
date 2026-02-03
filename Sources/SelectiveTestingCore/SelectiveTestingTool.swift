@@ -6,12 +6,10 @@ import DependencyCalculator
 import Foundation
 import Git
 import PathKit
-import Logging
+import SelectiveTestLogger
 import SelectiveTestShell
 import TestConfigurator
 import Workspace
-
-let logger = Logger(label: "cx.gera.XcodeSelectiveTesting")
 
 public final class SelectiveTestingTool {
     private let baseBranch: String?
@@ -20,85 +18,51 @@ public final class SelectiveTestingTool {
     private let changedFiles: [String]
     private let renderDependencyGraph: Bool
     private let turbo: Bool
-    private let dryRun: Bool
     private let dot: Bool
     private let verbose: Bool
-    private let testPlans: [String]
+    private let testPlan: String?
     private let config: Config?
 
     public init(baseBranch: String?,
                 basePath: String?,
-                testPlans: [String],
+                testPlan: String?,
                 changedFiles: [String],
                 printJSON: Bool = false,
                 renderDependencyGraph: Bool = false,
                 dot: Bool = false,
                 turbo: Bool = false,
-                dryRun: Bool = false,
                 verbose: Bool = false) throws
     {
-        var configCandidates: [Path] = []
-        if let suppliedBasePath = basePath.map({ Path($0) }) {
-            let baseDirectory: Path
-            if let ext = suppliedBasePath.extension,
-               ext == "xcworkspace" || ext == "xcodeproj" {
-                baseDirectory = suppliedBasePath.parent()
-            } else if suppliedBasePath.isDirectory {
-                baseDirectory = suppliedBasePath
-            } else {
-                baseDirectory = suppliedBasePath.parent()
-            }
-            configCandidates.append(baseDirectory + Config.defaultConfigName)
-        }
-        configCandidates.append(Path.current + Config.defaultConfigName)
-
-        if let configPath = configCandidates.first(where: { $0.exists }),
-           let configData = try? configPath.read(),
-           let loadedConfig = try Config.load(from: configData) {
-            self.config = loadedConfig
-            if verbose {
-                logger.info("Loaded config from \(configPath)")
-            }
+        if let configData = try? (Path.current + Config.defaultConfigName).read(),
+           let config = try Config.load(from: configData)
+        {
+            self.config = config
         } else {
             config = nil
         }
 
-        let finalBasePath = Path(basePath ??
+        let finalBasePath = basePath ??
             config?.basePath ??
             Path().glob("*.xcworkspace").first?.string ??
-            Path().glob("*.xcodeproj").first?.string ?? ".")
+            Path().glob("*.xcodeproj").first?.string ?? "."
 
         self.baseBranch = baseBranch
-        self.basePath = finalBasePath
+        self.basePath = Path(finalBasePath)
         self.changedFiles = changedFiles
         self.printJSON = printJSON
         self.renderDependencyGraph = renderDependencyGraph
         self.turbo = turbo
         self.dot = dot
-        self.dryRun = dryRun
         self.verbose = verbose
-
-        // Merge CLI test plans with config test plans
-        var allTestPlans: [String] = config?.allTestPlans ?? []
-        allTestPlans.append(contentsOf: testPlans)
-        self.testPlans = allTestPlans
+        self.testPlan = testPlan ?? config?.testPlan
     }
 
     public func run() async throws -> Set<TargetIdentity> {
-        let workingDirectory: Path
-        if let ext = basePath.extension,
-           ext == "xcworkspace" || ext == "xcodeproj" {
-            workingDirectory = basePath.parent()
-        } else if basePath.isDirectory {
-            workingDirectory = basePath
-        } else {
-            workingDirectory = basePath.parent()
-        }
         // 1. Identify changed files
         let changeset: Set<Path>
 
         if changedFiles.isEmpty {
-            logger.info("Finding changeset for repository at \(basePath)")
+            Logger.message("Finding changeset for repository at \(basePath)")
             if let baseBranch {
                 changeset = try Git(path: basePath).changeset(baseBranch: baseBranch, verbose: verbose)
             } else {
@@ -109,7 +73,7 @@ public final class SelectiveTestingTool {
             changeset = Set(changedFiles.map { Path($0).absolute() })
         }
 
-        if verbose { logger.info("Changed files: \(changeset)") }
+        if verbose { Logger.message("Changed files: \(changeset)") }
 
         // 2. Parse workspace: find which files belong to which targets and target dependencies
         let workspaceInfo = try WorkspaceInfo.parseWorkspace(at: basePath.absolute(),
@@ -136,67 +100,48 @@ public final class SelectiveTestingTool {
                 .sorted(by: { $0.description < $1.description }).forEach { target in
                     switch target.type {
                     case .package:
-                        logger.info("Package target at \(target.path): \(target.name) depends on:")
+                        Logger.message("Package target at \(target.path): \(target.name) depends on:")
 
                     case .project:
-                        logger.info("Project target at \(target.path): \(target.name) depends on:")
+                        Logger.message("Project target at \(target.path): \(target.name) depends on:")
                     }
 
                     workspaceInfo.dependencyStructure
                         .dependencies(for: target)
                         .sorted(by: { $0.description < $1.description }).forEach { dependency in
-                            logger.info("    ﹂\(dependency)")
+                            Logger.message("    ﹂\(dependency)")
                         }
                 }
 
-            logger.info("Files for targets:")
+            Logger.message("Files for targets:")
             for key in workspaceInfo.files.keys.sorted(by: { $0.description < $1.description }) {
-                logger.info("\(key.description): ")
+                Logger.message("\(key.description): ")
                 workspaceInfo.files[key]?.forEach { filePath in
-                    logger.info("\t\(filePath)")
+                    Logger.message("\t\(filePath)")
                 }
             }
 
-            logger.info("Folders for targets:")
+            Logger.message("Folders for targets:")
             for (key, folder) in workspaceInfo.folders.sorted(by: { $0.key < $1.key }) {
-                logger.info("\t\(folder): \(key)")
+                Logger.message("\t\(folder): \(key)")
             }
         }
 
-        if !dryRun {
+        if let testPlan {
             // 4. Configure workspace to test given targets
-            let plansToUpdate = testPlans.isEmpty ?
-            workspaceInfo.candidateTestPlans :
-            testPlans.map { plan in
-                let planPath = Path(plan)
-                let resolved = planPath.isAbsolute ? planPath : workingDirectory + planPath
-                return resolved.absolute().string
-            }
-
-            if !plansToUpdate.isEmpty {
-                for testPlan in plansToUpdate {
-                    try enableTests(at: Path(testPlan),
-                                    targetsToTest: affectedTargets)
-                }
-            } else if !printJSON {
-                if affectedTargets.isEmpty {
-                    if verbose { logger.info("No targets affected") }
-                } else {
-                    if verbose { logger.info("Targets to test:") }
-
-                    for target in affectedTargets {
-                        logger.info(Logger.Message(stringLiteral: target.description))
-                    }
-                }
-            }
+            try enableTests(at: Path(testPlan),
+                            targetsToTest: affectedTargets)
+        } else if let testPlan = workspaceInfo.candidateTestPlan {
+            try enableTests(at: Path(testPlan),
+                            targetsToTest: affectedTargets)
         } else if !printJSON {
             if affectedTargets.isEmpty {
-                if verbose { logger.info("No targets affected") }
+                if verbose { Logger.message("No targets affected") }
             } else {
-                if verbose { logger.info("Targets to test:") }
+                if verbose { Logger.message("Targets to test:") }
 
                 for target in affectedTargets {
-                    logger.info(Logger.Message(stringLiteral: target.description))
+                    Logger.message(target.description)
                 }
             }
         }

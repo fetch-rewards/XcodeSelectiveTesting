@@ -4,18 +4,16 @@
 
 import Foundation
 import Git
-@preconcurrency import PathKit
-import Logging
+import PathKit
+import SelectiveTestLogger
 import SelectiveTestShell
 import Workspace
 import XcodeProj
 
-let logger = Logger(label: "cx.gera.XcodeSelectiveTesting")
-
 extension PBXBuildFile {
     func paths(projectFolder: Path) -> [Path] {
         guard let file else {
-            logger.warning("PBXBuildFile without file: self=\(self), \n self.product=\(String(describing: product))")
+            Logger.warning("PBXBuildFile without file: self=\(self), \n self.product=\(String(describing: product))")
             return []
         }
         
@@ -31,7 +29,7 @@ extension PBXBuildFile {
         }
         
         guard paths.count > 0 else {
-            logger.warning("File without paths: self=\(self), \n self.file=\(String(describing: file)), \n self.product=\(String(describing: product))")
+            Logger.warning("File without paths: self=\(self), \n self.file=\(String(describing: file)), \n self.product=\(String(describing: product))")
             return []
         }
         
@@ -68,51 +66,21 @@ extension PBXNativeTarget {
 }
 
 extension WorkspaceInfo {
-    /// Checks if the root Package.swift should be evaluated. It depends if there is a project file already. Project file is considered a higher level definition and should be parsed first.
-    private static func shouldIncludeRootPackage(at path: Path) throws -> Bool {
-        switch path.extension {
-        case "xcodeproj":
-            return false
-        case "xcworkspace":
-            let workspace = try XCWorkspace(path: path)
-            let projects = try workspace.allProjects(basePath: path.parent())
-            
-            if projects.contains(where: { (_, path) in
-                path.contains("xcodeproj")
-            }) {
-                return false
-            }
-            else {
-                return true
-            }
-        default:
-            return true
-        }
-    }
-    
-    public static func parseWorkspace(at proposedPath: Path,
+    public static func parseWorkspace(at path: Path,
                                       config: WorkspaceInfo.AdditionalConfig? = nil,
                                       exclude: [String]) throws -> WorkspaceInfo
     {
-        var path = proposedPath
-        
-        if path.extension != "xcworkspace" && path.extension != "xcodeproj" {
-            if let altPath = path.glob("*.xcworkspace").first ?? path.glob("*.xcodeproj").first {
-                path = altPath
-            }
-        }
-        
-        let includeRootPackage = try shouldIncludeRootPackage(at: path)
+        let includeRootPackage = !Set(["xcworkspace", "xcodeproj"]).contains(path.extension)
+
         var (packageWorkspaceInfo, packages) = try parsePackages(in: path, includeRootPackage: includeRootPackage, exclude: exclude)
 
         var resultDependencies = packageWorkspaceInfo.dependencyStructure
         var files = packageWorkspaceInfo.files
         var folders = packageWorkspaceInfo.folders
-        var candidateTestPlans = packageWorkspaceInfo.candidateTestPlans
+        var candidateTestPlan = packageWorkspaceInfo.candidateTestPlan
 
         let allProjects: [(XcodeProj, Path)]
         var workspaceDefinitionPath: Path? = nil
-        
         if path.extension == "xcworkspace" {
             let workspace = try XCWorkspace(path: path)
 
@@ -146,35 +114,25 @@ extension WorkspaceInfo {
 
             files = files.merging(with: newFiles)
             folders = folders.merging(with: newDependencies.folders)
-            candidateTestPlans.append(contentsOf: newDependencies.candidateTestPlans)
+            if candidateTestPlan == nil {
+                candidateTestPlan = newDependencies.candidateTestPlan
+            }
         }
 
         let workspaceInfo = WorkspaceInfo(files: files,
                                           folders: folders,
                                           dependencyStructure: resultDependencies,
-                                          candidateTestPlans: candidateTestPlans)
-        let finalWorkspaceInfo: WorkspaceInfo
+                                          candidateTestPlan: candidateTestPlan)
         if let config {
-            let additionalBasePath: Path
-            if path.extension == "xcworkspace" || path.extension == "xcodeproj" {
-                additionalBasePath = path.parent()
-            } else {
-                additionalBasePath = path
-            }
             // Process additional config
-            finalWorkspaceInfo = processAdditional(config: config,
-                                                   workspaceInfo: workspaceInfo,
-                                                   basePath: additionalBasePath)
+            return processAdditional(config: config, workspaceInfo: workspaceInfo)
         } else {
-            finalWorkspaceInfo = workspaceInfo
+            return workspaceInfo
         }
-
-        return finalWorkspaceInfo.pruningDisconnectedTargets()
     }
 
     static func processAdditional(config: WorkspaceInfo.AdditionalConfig,
-                                  workspaceInfo: WorkspaceInfo,
-                                  basePath: Path) -> WorkspaceInfo
+                                  workspaceInfo: WorkspaceInfo) -> WorkspaceInfo
     {
         var files = workspaceInfo.files
         var folders = workspaceInfo.folders
@@ -183,12 +141,12 @@ extension WorkspaceInfo {
 
         for (targetName, dependOnTargets) in config.dependencies {
             guard let target = allTargets[targetName] else {
-                logger.error("Config: Cannot resolve \(targetName) to any known target")
+                Logger.error("Config: Cannot resolve \(targetName) to any known target")
                 continue
             }
             for dependOnTargetName in dependOnTargets {
                 guard let targetDependOn = allTargets[dependOnTargetName] else {
-                    logger.error("Config: Cannot resolve \(dependOnTargetName) to any known target")
+                    Logger.error("Config: Cannot resolve \(dependOnTargetName) to any known target")
                     continue
                 }
 
@@ -200,15 +158,15 @@ extension WorkspaceInfo {
 
         for (targetName, filesToAdd) in config.targetsFiles {
             guard let target = allTargets[targetName] else {
-                logger.error("Config: Cannot resolve \(targetName) to any known target")
+                Logger.error("Config: Cannot resolve \(targetName) to any known target")
                 continue
             }
 
             for filePath in filesToAdd {
-                let path = (basePath + filePath).absolute()
+                let path = Path(filePath).absolute()
 
                 guard path.exists else {
-                    logger.error("Config: Path \(path) does not exist")
+                    Logger.error("Config: Path \(path) does not exist")
                     continue
                 }
 
@@ -258,15 +216,10 @@ extension WorkspaceInfo {
         }
     }
 
-    static func parsePackages(in proposedPath: Path,
+    static func parsePackages(in path: Path,
                               includeRootPackage: Bool,
                               exclude: [String]) throws -> (WorkspaceInfo, [PackageTargetMetadata])
     {
-        var path = proposedPath
-        if path.extension == "xcworkspace" || path.extension == "xcodeproj" {
-            path = proposedPath.parent()
-        }
-        
         var dependsOn: [TargetIdentity: Set<TargetIdentity>] = [:]
         var folders: [Path: TargetIdentity] = [:]
         var files: [TargetIdentity: Set<Path>] = [:]
@@ -279,7 +232,7 @@ extension WorkspaceInfo {
 
             for affectedByPath in metadata.affectedBy {
                 guard affectedByPath.exists else {
-                    logger.warning("Path \(affectedByPath) is mentioned from package at \(metadata.path) but does not exist")
+                    Logger.warning("Path \(affectedByPath) is mentioned from package at \(metadata.path) but does not exist")
                     continue
                 }
 
@@ -307,7 +260,7 @@ extension WorkspaceInfo {
         var dependsOn: [TargetIdentity: Set<TargetIdentity>] = [:]
         var files: [TargetIdentity: Set<Path>] = [:]
         var folders: [Path: TargetIdentity] = [:]
-        var candidateTestPlans: [Path] = []
+        var candidateTestPlan: String? = nil
 
         var packagesByName: [String: PackageTargetMetadata] = packages.toDictionary(path: \.name)
         let targetsByName = project.pbxproj.nativeTargets.toDictionary(path: \.name)
@@ -316,7 +269,7 @@ extension WorkspaceInfo {
             let absolutePath = path.parent() + localPackage.relativePath
 
             guard let newPackages = try? PackageTargetMetadata.parse(at: absolutePath) else {
-                logger.warning("Cannot find local package at \(absolutePath)")
+                Logger.warning("Cannot find local package at \(absolutePath)")
                 return
             }
             for package in newPackages {
@@ -330,7 +283,7 @@ extension WorkspaceInfo {
             // Target dependencies
             for dependency in target.dependencies {
                 guard let name = dependency.target?.name else {
-                    logger.warning("Target without name: \(dependency)")
+                    Logger.warning("Target without name: \(dependency)")
                     continue
                 }
 
@@ -338,7 +291,7 @@ extension WorkspaceInfo {
                     dependsOn.insert(targetIdentity,
                                      dependOn: TargetIdentity.project(path: path, target: dependencyTarget))
                 } else {
-                    logger.warning("Unknown target: \(name)")
+                    Logger.warning("Unknown target: \(name)")
                     dependsOn.insert(targetIdentity,
                                      dependOn: TargetIdentity.project(path: path, targetName: name, testTarget: false))
                 }
@@ -348,7 +301,7 @@ extension WorkspaceInfo {
             for packageDependency in (target.packageProductDependencies ?? []) {
                 let package = packageDependency.productName
                 guard let packageMetadata = packagesByName[package] else {
-                    logger.warning("Package \(package) not found")
+                    Logger.warning("Package \(package) not found")
                     continue
                 }
                 dependsOn.insert(targetIdentity,
@@ -364,11 +317,6 @@ extension WorkspaceInfo {
             filesPaths = try filesPaths.union(Set(target.resourcesBuildPhase()?.files?.flatMap { file in
                 file.paths(projectFolder: path.parent())
             } ?? []))
-
-            // Synchronized Groups Files
-            filesPaths = filesPaths.union(
-                Set(fileSystemSynchronizedGroupsFiles(target: target, projectFolder: path.parent()))
-            )
 
             // Establish dependencies based on linked frameworks build phase
             try target.frameworksBuildPhase()?.files?.forEach { file in
@@ -397,17 +345,14 @@ extension WorkspaceInfo {
         // Find existing test plans
         project.sharedData?.schemes.forEach { scheme in
             scheme.testAction?.testPlans?.forEach { plan in
-                let testPlanPath = path.parent() + plan.reference.replacingOccurrences(of: "container:", with: "")
-                if !candidateTestPlans.contains(testPlanPath) {
-                    candidateTestPlans.append(testPlanPath)
-                }
+                candidateTestPlan = plan.reference.replacingOccurrences(of: "container:", with: "")
             }
         }
 
         return WorkspaceInfo(files: files,
                              folders: folders,
                              dependencyStructure: DependencyGraph(dependsOn: dependsOn),
-                             candidateTestPlans: candidateTestPlans.map { $0.string })
+                             candidateTestPlan: candidateTestPlan)
     }
 
     private static func isSwiftVersion6Plus() throws -> Bool {
@@ -426,32 +371,5 @@ extension WorkspaceInfo {
         } else {
             return false
         }
-    }
-
-    /// Search all files specified in fileSystemSynchronizedGroups.
-    /// Currently, file extensions are note considered at all, so all files in the folder are subject to the search.
-    /// NOTE: FileSystemSynchronizedFileExceptionSet is not suppored yet.
-    ///
-    /// ref: https://github.com/tuist/XcodeGraph/pull/108
-    /// The implementation of `XcodeGraph` only considers cases where the root is a folder.
-    /// so customizations have also been added.
-    private static func fileSystemSynchronizedGroupsFiles(
-        target: PBXNativeTarget,
-        projectFolder: Path
-    ) -> [Path] {
-        guard let fileSystemSynchronizedGroups = target.fileSystemSynchronizedGroups else { return [] }
-        var paths: [Path] = []
-        fileSystemSynchronizedGroups.forEach { group in
-            let folderPath: Path?
-            switch group.sourceTree {
-            case .absolute, .sourceRoot, .group:
-                folderPath = try? group.fullPath(sourceRoot: projectFolder)
-            default:
-                folderPath = group.path.map { Path($0) }
-            }
-            guard let folderPath else { return }
-            paths.append(contentsOf: (try? folderPath.recursiveChildren()) ?? [])
-        }
-        return paths
     }
 }

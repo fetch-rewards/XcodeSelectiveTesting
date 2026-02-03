@@ -5,102 +5,91 @@
 import PathKit
 @testable import SelectiveTestingCore
 import SelectiveTestShell
-import Testing
 import Workspace
+import XCTest
 
-@Suite
-struct SelectiveTestingPackagesTests {
-    @Test
-    func projectLoading_changePackage() async throws {
+final class SelectiveTestingPackagesTests: XCTestCase {
+    let testTool = IntegrationTestTool()
+
+    override func setUp() async throws {
+        try await super.setUp()
+
+        try testTool.setUp()
+    }
+
+    override func tearDown() async throws {
+        try await super.tearDown()
+
+        try testTool.tearDown()
+    }
+
+    func testProjectLoading_changePackage() async throws {
         // given
-        let testTool = try IntegrationTestTool()
-        defer { try? testTool.tearDown() }
-
         let tool = try testTool.createSUT()
-
         // when
         try testTool.changeFile(at: testTool.projectPath + "ExamplePackage/Sources/ExamplePackage/ExamplePackage.swift")
 
         // then
         let result = try await tool.run()
-        #expect(result == Set([testTool.mainProjectMainTarget(),
-                               testTool.mainProjectTests(),
-                               testTool.mainProjectUITests(),
-                               testTool.package(),
-                               testTool.packageTests(),
-                               testTool.subtests()]))
+        XCTAssertEqual(result, Set([testTool.mainProjectMainTarget,
+                                    testTool.mainProjectTests,
+                                    testTool.mainProjectUITests,
+                                    testTool.package,
+                                    testTool.packageTests,
+                                    testTool.subtests]))
     }
 
-    @Test
-    func projectLoading_changePackageDefinition() async throws {
+    func testProjectLoading_changePackageDefintion() async throws {
         // given
-        let testTool = try IntegrationTestTool()
-        defer { try? testTool.tearDown() }
-
         let tool = try testTool.createSUT()
-
         // when
         try testTool.changeFile(at: testTool.projectPath + "ExamplePackage/Package.swift")
 
         // then
         let result = try await tool.run()
-        #expect(result == Set([testTool.mainProjectMainTarget(),
-                               testTool.mainProjectTests(),
-                               testTool.mainProjectUITests(),
-                               testTool.package(),
-                               testTool.packageTests(),
-                               testTool.subtests(),
-                               testTool.binary()]))
+        XCTAssertEqual(result, Set([testTool.mainProjectMainTarget,
+                                    testTool.mainProjectTests,
+                                    testTool.mainProjectUITests,
+                                    testTool.package,
+                                    testTool.packageTests,
+                                    testTool.subtests,
+                                    testTool.binary]))
     }
 
-    @Test
-    func projectLoading_packageAddFile() async throws {
+    func testProjectLoading_packageAddFile() async throws {
         // given
-        let testTool = try IntegrationTestTool()
-        defer { try? testTool.tearDown() }
-
         let tool = try testTool.createSUT()
-
         // when
         try testTool.addFile(at: testTool.projectPath + "ExamplePackage/Sources/ExamplePackage/ExamplePackageFile.swift")
 
         // then
         let result = try await tool.run()
-        #expect(result == Set([testTool.mainProjectMainTarget(),
-                               testTool.mainProjectTests(),
-                               testTool.mainProjectUITests(),
-                               testTool.package(),
-                               testTool.packageTests(),
-                               testTool.subtests()]))
+        XCTAssertEqual(result, Set([testTool.mainProjectMainTarget,
+                                    testTool.mainProjectTests,
+                                    testTool.mainProjectUITests,
+                                    testTool.package,
+                                    testTool.packageTests,
+                                    testTool.subtests]))
     }
 
-    @Test
-    func projectLoading_packageRemoveFile() async throws {
+    func testProjectLoading_packageRemoveFile() async throws {
         // given
-        let testTool = try IntegrationTestTool()
-        defer { try? testTool.tearDown() }
-
         let tool = try testTool.createSUT()
-
         // when
         try testTool.removeFile(at: testTool.projectPath + "ExamplePackage/Sources/ExamplePackage/ExamplePackage.swift")
 
         // then
         let result = try await tool.run()
-        #expect(result == Set([testTool.mainProjectMainTarget(),
-                               testTool.mainProjectTests(),
-                               testTool.mainProjectUITests(),
-                               testTool.package(),
-                               testTool.packageTests(),
-                               testTool.subtests()]))
+        XCTAssertEqual(result, Set([testTool.mainProjectMainTarget,
+                                    testTool.mainProjectTests,
+                                    testTool.mainProjectUITests,
+                                    testTool.package,
+                                    testTool.packageTests,
+                                    testTool.subtests]))
     }
 
-    @Test
-    func binaryTargetChange() async throws {
+    func testBinaryTargetChange() async throws {
         // given
-        let testTool = try IntegrationTestTool()
-        defer { try? testTool.tearDown() }
-
         let tool = try testTool.createSUT()
 
         // when
@@ -108,6 +97,6 @@ struct SelectiveTestingPackagesTests {
 
         // then
         let result = try await tool.run()
-        #expect(result == Set([testTool.binary()]))
+        XCTAssertEqual(result, Set([testTool.binary]))
     }
 }

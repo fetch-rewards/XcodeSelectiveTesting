@@ -7,10 +7,11 @@ import PackagePlugin
 
 @main
 struct SelectiveTestingPlugin: CommandPlugin {
-    private func run(_ executable: URL, arguments: [String] = []) throws {
+    private func run(_ executable: String, arguments: [String] = []) throws {
+        let executableURL = URL(fileURLWithPath: executable)
 
         let process = Process()
-        process.executableURL = executable
+        process.executableURL = executableURL
         process.arguments = arguments
 
         try process.run()
@@ -23,10 +24,10 @@ struct SelectiveTestingPlugin: CommandPlugin {
     }
 
     func performCommand(context: PluginContext, arguments: [String]) async throws {
-        FileManager.default.changeCurrentDirectoryPath(context.package.directoryURL.path)
+        FileManager().changeCurrentDirectoryPath(context.package.directory.string)
         let tool = try context.tool(named: "xcode-selective-test")
 
-        try run(tool.url, arguments: arguments)
+        try run(tool.path.string, arguments: arguments)
     }
 }
 
@@ -35,7 +36,7 @@ struct SelectiveTestingPlugin: CommandPlugin {
 
     extension SelectiveTestingPlugin: XcodeCommandPlugin {
         func performCommand(context: XcodePluginContext, arguments: [String]) throws {
-            FileManager.default.changeCurrentDirectoryPath(context.xcodeProject.directoryURL.path)
+            FileManager().changeCurrentDirectoryPath(context.xcodeProject.directory.string)
 
             let tool = try context.tool(named: "xcode-selective-test")
 
@@ -47,29 +48,16 @@ struct SelectiveTestingPlugin: CommandPlugin {
                 toolArguments.remove(at: indexOfTarget)
             }
             
-            if !toolArguments.contains(where: { $0 == "--test-plan" }) {
-                let allFiles = context.xcodeProject.targets.reduce([]) { partialResult, target in
-                    partialResult + target.inputFiles
-                }
-                
-                let testPlans = allFiles.filter {
-                    $0.url.pathExtension == "xctestplan"
-                }
-
-                if !testPlans.isEmpty {
-                    if testPlans.count == 1 {
-                        print("Using \(testPlans[0].url.path()) test plan")
-                    } else {
-                        print("Using \(testPlans.count) test plans")
-                    }
-
-                    for testPlan in testPlans {
-                        toolArguments.append(contentsOf: ["--test-plan", testPlan.url.path()])
-                    }
-                }
+            if !toolArguments.contains(where: { $0 == "--test-plan" }),
+               let testPlan = context.xcodeProject.filePaths.first(where: {
+                   $0.extension == "xctestplan"
+               })
+            {
+                print("Using \(testPlan.string) test plan")
+                toolArguments.append(contentsOf: ["--test-plan", testPlan.string])
             }
 
-            try run(tool.url, arguments: toolArguments)
+            try run(tool.path.string, arguments: toolArguments)
         }
     }
 #endif

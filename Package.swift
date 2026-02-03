@@ -1,4 +1,4 @@
-// swift-tools-version: 6.0
+// swift-tools-version: 5.6
 
 import PackageDescription
 
@@ -11,65 +11,41 @@ let products: [PackageDescription.Product] = [
         name: "XcodeSelectiveTest",
         targets: ["SelectiveTestingPlugin"]
     ),
-    .library(
-        name: "XcodeSelectiveTestCore",
-        targets: ["SelectiveTestingCore"]
-    )
 ]
-
-let flags: [PackageDescription.SwiftSetting] = [.enableExperimentalFeature("StrictConcurrency")]
 
 let targets: [PackageDescription.Target] = [
     .executableTarget(
         name: "xcode-selective-test",
         dependencies: ["SelectiveTestingCore",
-                       .product(name: "ArgumentParser", package: "swift-argument-parser")],
-        swiftSettings: flags
+                       .product(name: "ArgumentParser", package: "swift-argument-parser")]
     ),
     .target(name: "SelectiveTestingCore",
             dependencies: ["DependencyCalculator",
                            "TestConfigurator",
                            "Git",
                            "PathKit",
-                           "Yams",
-                           .product(name: "ArgumentParser", package: "swift-argument-parser")],
-            swiftSettings: flags
-    ),
+                           "Rainbow",
+                           "Yams"]),
     .target(name: "DependencyCalculator",
-            dependencies: ["Workspace", "PathKit", "Git", .product(name: "Logging", package: "swift-log")],
-            swiftSettings: flags
-    ),
+            dependencies: ["Workspace", "PathKit", "SelectiveTestLogger", "Git"]),
     .target(name: "TestConfigurator",
-            dependencies: [
-                "Workspace",
-                "PathKit",
-                .product(name: "Logging", package: "swift-log"),
-                .product(name: "ArgumentParser", package: "swift-argument-parser")
-            ],
-            swiftSettings: flags
-    ),
+            dependencies: ["Workspace", "PathKit", "SelectiveTestLogger"]),
     .target(name: "Workspace",
-            dependencies: ["XcodeProj", .product(name: "Logging", package: "swift-log")],
-            swiftSettings: flags
-    ),
+            dependencies: ["XcodeProj", "SelectiveTestLogger"]),
     .target(name: "Git",
-            dependencies: ["SelectiveTestShell", "PathKit", .product(name: "Logging", package: "swift-log")],
-            swiftSettings: flags
-    ),
-    .target(name: "SelectiveTestShell",
-            swiftSettings: flags
-    ),
+            dependencies: ["SelectiveTestShell", "SelectiveTestLogger", "PathKit"]),
+    .target(name: "SelectiveTestLogger",
+            dependencies: ["Rainbow"]),
+    .target(name: "SelectiveTestShell"),
     .testTarget(
         name: "SelectiveTestingTests",
-        dependencies: ["xcode-selective-test", "PathKit", "Workspace"],
-        resources: [.copy("ExampleProject")],
-        swiftSettings: flags
+        dependencies: ["xcode-selective-test", "PathKit"],
+        resources: [.copy("ExampleProject")]
     ),
     .testTarget(
         name: "DependencyCalculatorTests",
         dependencies: ["DependencyCalculator", "Workspace", "PathKit", "SelectiveTestingCore"],
-        resources: [.copy("ExamplePackages")],
-        swiftSettings: flags
+        resources: [.copy("ExamplePackages")]
     ),
     .plugin(
         name: "SelectiveTestingPlugin",
@@ -83,7 +59,7 @@ let targets: [PackageDescription.Target] = [
             ]
         ),
         dependencies: ["xcode-selective-test"]
-    )
+    ),
 ]
 
 let package = Package(
@@ -93,11 +69,11 @@ let package = Package(
     ],
     products: products,
     dependencies: [
-        .package(url: "https://github.com/tuist/XcodeProj.git", .upToNextMajor(from: "9.0.2")),
+        .package(url: "https://github.com/tuist/XcodeProj.git", .upToNextMajor(from: "8.24.1")),
         .package(url: "https://github.com/apple/swift-argument-parser.git", .upToNextMajor(from: "1.2.0")),
         .package(url: "https://github.com/kylef/PathKit.git", .upToNextMinor(from: "1.0.0")),
+        .package(url: "https://github.com/onevcat/Rainbow", .upToNextMajor(from: "4.0.0")),
         .package(url: "https://github.com/jpsim/Yams.git", from: "5.0.5"),
-        .package(url: "https://github.com/apple/swift-log", from: "1.6.0")
     ],
     targets: targets
 )

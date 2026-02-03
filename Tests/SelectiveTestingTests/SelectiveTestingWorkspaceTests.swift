@@ -5,151 +5,120 @@
 import PathKit
 @testable import SelectiveTestingCore
 import SelectiveTestShell
-import Testing
 import Workspace
+import XCTest
 
-@Suite
-struct SelectiveTestingWorkspaceTests {
-    @Test
-    func projectLoading_empty() async throws {
-        try await IntegrationTestTool.withTestTool { testTool in
-            // given
-            let tool = try testTool.createSUT()
+final class SelectiveTestingWorksapceTests: XCTestCase {
+    let testTool = IntegrationTestTool()
 
-            // when
-            let result = try await tool.run()
+    override func setUp() async throws {
+        try await super.setUp()
 
-            // then
-            #expect(result == Set())
-        }
+        try testTool.setUp()
     }
 
-    @Test
-    func projectLoading_changeLibrary() async throws {
-        try await IntegrationTestTool.withTestTool { testTool in
-            // given
-            let tool = try testTool.createSUT()
-            // when
-            try testTool.changeFile(at: testTool.projectPath + "ExampleLibrary/ExampleLibrary/ExampleLibrary.swift")
+    override func tearDown() async throws {
+        try await super.tearDown()
 
-            // then
-            let result = try await tool.run()
-            #expect(result == Set([testTool.mainProjectMainTarget(),
-                                   testTool.mainProjectTests(),
-                                   testTool.mainProjectUITests(),
-                                   testTool.exampleLibrary(),
-                                   testTool.exampleLibraryTests()]))
-        }
+        try testTool.tearDown()
     }
 
-    @Test
-    func projectLoading_changeAsset() async throws {
-        try await IntegrationTestTool.withTestTool { testTool in
-            // given
-            let tool = try testTool.createSUT()
-            // when
-            try testTool.changeFile(at: testTool.projectPath + "ExampleProject/Assets.xcassets/Contents.json")
-
-            // then
-            let result = try await tool.run()
-            #expect(result == Set([testTool.mainProjectMainTarget(),
-                                   testTool.mainProjectTests(),
-                                   testTool.mainProjectUITests()]))
-        }
+    func testProjectLoading_empty() async throws {
+        // given
+        let tool = try testTool.createSUT()
+        // when
+        let result = try await tool.run()
+        // then
+        XCTAssertEqual(result, Set())
     }
 
-    @Test
-    func projectLoading_testPlanChange() async throws {
-        try await IntegrationTestTool.withTestTool { testTool in
-            // given
-            let tool = try testTool.createSUT()
-            // when
-            try testTool.changeFile(at: testTool.projectPath + "ExampleProject.xctestplan")
+    func testProjectLoading_changeLibrary() async throws {
+        // given
+        let tool = try testTool.createSUT()
+        // when
+        try testTool.changeFile(at: testTool.projectPath + "ExampleLibrary/ExampleLibrary/ExampleLibrary.swift")
 
-            // then
-            let result = try await tool.run()
-            #expect(result == Set())
-        }
+        // then
+        let result = try await tool.run()
+        XCTAssertEqual(result, Set([testTool.mainProjectMainTarget,
+                                    testTool.mainProjectTests,
+                                    testTool.mainProjectUITests,
+                                    testTool.exampleLibrary,
+                                    testTool.exampleLibraryTests]))
     }
 
-    @Test
-    func projectLoading_testWorkspaceFileChange() async throws {
-        try await IntegrationTestTool.withTestTool { testTool in
-            // given
-            let tool = try testTool.createSUT()
-            // when
-            try testTool.changeFile(at: testTool.projectPath + "ExampleWorkspace.xcworkspace/contents.xcworkspacedata")
+    func testProjectLoading_changeAsset() async throws {
+        // given
+        let tool = try testTool.createSUT()
+        // when
+        try testTool.changeFile(at: testTool.projectPath + "ExampleProject/Assets.xcassets/Contents.json")
 
-            // then
-            let result = try await tool.run()
-            #expect(result == Set([
-                testTool.mainProjectMainTarget(),
-                testTool.mainProjectTests(),
-                testTool.mainProjectUITests(),
-                testTool.mainProjectLibrary(),
-                testTool.mainProjectLibraryTests(),
-                testTool.exampleLibraryTests(),
-                testTool.exampleLibrary(),
-                testTool.exampleLibraryInGroup()
-            ]))
-        }
+        // then
+        let result = try await tool.run()
+        XCTAssertEqual(result, Set([testTool.mainProjectMainTarget,
+                                    testTool.mainProjectTests,
+                                    testTool.mainProjectUITests]))
     }
 
-    @Test
-    func projectLoading_testProjectFileChange() async throws {
-        try await IntegrationTestTool.withTestTool { testTool in
-            // given
-            let tool = try testTool.createSUT()
-            // when
-            try testTool.changeFile(at: testTool.projectPath + "ExampleProject.xcodeproj/project.pbxproj")
-            // then
-            let result = try await tool.run()
-            #expect(result == Set([
-                testTool.mainProjectMainTarget(),
-                testTool.mainProjectTests(),
-                testTool.mainProjectUITests(),
-                testTool.mainProjectLibrary(),
-                testTool.mainProjectLibraryTests(),
-            ]))
-        }
+    func testProjectLoading_testPlanChange() async throws {
+        // given
+        let tool = try testTool.createSUT()
+        // when
+        try testTool.changeFile(at: testTool.projectPath + "ExampleProject.xctestplan")
+
+        // then
+        let result = try await tool.run()
+        XCTAssertEqual(result, Set())
     }
 
-    @Test
-    func inferTestPlan() async throws {
-        try await IntegrationTestTool.withTestTool { testTool in
-            // given
-            let tool = try testTool.createSUT(config: nil,
-                                              testPlan: nil)
-            // when
-            try testTool.changeFile(at: testTool.projectPath + "ExampleLibrary/ExampleLibrary/ExampleLibrary.swift")
-
-            // then
-            _ = try await tool.run()
-            try testTool.validateTestPlan(testPlanPath: testTool.projectPath + "ExampleProject.xctestplan",
-                                          expected: Set([testTool.mainProjectTests(),
-                                                         testTool.mainProjectUITests(),
-                                                         testTool.exampleLibraryTests()]))
-        }
+    func testProjectLoading_testWorkspaceFileChange() async throws {
+        // given
+        let tool = try testTool.createSUT()
+        // when
+        try testTool.changeFile(at: testTool.projectPath + "ExampleWorkspace.xcworkspace/contents.xcworkspacedata")
+        // then
+        let result = try await tool.run()
+        XCTAssertEqual(result, Set([
+            testTool.mainProjectMainTarget,
+            testTool.mainProjectTests,
+            testTool.mainProjectUITests,
+            testTool.mainProjectLibrary,
+            testTool.mainProjectLibraryTests,
+            testTool.exampleLibraryTests,
+            testTool.exampleLibrary,
+            testTool.exampleLibraryInGroup,
+        ]))
     }
 
-    @Test
-    func inferTestPlanInSubfolder() async throws {
-        try await IntegrationTestTool.withTestTool(subfolder: true) { testTool in
-            // given
-            let tool = try testTool.createSUT(
-                config: nil,
-                basePath: testTool.projectPath + "Subfolder",
-                testPlan: nil)
+    func testProjectLoading_testProjectFileChange() async throws {
+        // given
+        let tool = try testTool.createSUT()
+        // when
+        try testTool.changeFile(at: testTool.projectPath + "ExampleProject.xcodeproj/project.pbxproj")
 
-            // when
-            try testTool.changeFile(at: testTool.projectPath + "Subfolder/ExampleLibrary/ExampleLibrary/ExampleLibrary.swift")
+        // then
+        let result = try await tool.run()
+        XCTAssertEqual(result, Set([
+            testTool.mainProjectMainTarget,
+            testTool.mainProjectTests,
+            testTool.mainProjectUITests,
+            testTool.mainProjectLibrary,
+            testTool.mainProjectLibraryTests,
+        ]))
+    }
 
-            // then
-            _ = try await tool.run()
-            try testTool.validateTestPlan(testPlanPath: testTool.projectPath + "Subfolder/ExampleProject.xctestplan",
-                                          expected: Set([testTool.mainProjectTests(),
-                                                         testTool.mainProjectUITests(),
-                                                         testTool.exampleLibraryTests()]))
-        }
+    func testInferTestPlan() async throws {
+        // given
+        let tool = try testTool.createSUT(config: nil,
+                                          testPlan: nil)
+        // when
+        try testTool.changeFile(at: testTool.projectPath + "ExampleLibrary/ExampleLibrary/ExampleLibrary.swift")
+
+        // then
+        let _ = try await tool.run()
+        try testTool.validateTestPlan(testPlanPath: testTool.projectPath + "ExampleProject.xctestplan",
+                                      expected: Set([testTool.mainProjectTests,
+                                                     testTool.mainProjectUITests,
+                                                     testTool.exampleLibraryTests]))
     }
 }
