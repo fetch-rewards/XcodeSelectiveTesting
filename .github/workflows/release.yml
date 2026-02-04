@@ -34,7 +34,6 @@ jobs:
         destination:
           - { os: macos-15 }
           - { os: macos-14 }
-          - { os: macos-13 }
     steps:
     - uses: actions/download-artifact@v4
       with:
